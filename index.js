@@ -79,6 +79,26 @@ app.get("/studios/:id" , async(req, res) =>{
     }
 })
 
+// ----------------------- studio data update -------------------------
+
+
+
+app.put("/studios/:id" , async(req, res) =>{
+    const id = req.params.id;
+    const query = {_id: new ObjectId(id)};
+    const updateData = req.body;
+    try{
+        const result = await studio.updateOne(query, {$set:updateData});
+        res.send({status:200 , message:"success" , data: result});
+    }catch(error){
+        console.dir(error);
+    }
+})
+
+
+
+
+
 
     
 
