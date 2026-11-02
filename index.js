@@ -1,3 +1,4 @@
+
 import express from "express";
 import cors from "cors"
 import 'dotenv/config'
@@ -96,7 +97,21 @@ app.put("/studios/:id" , async(req, res) =>{
 })
 
 
+// ---------------- my listing  -----------------
 
+app.get("/my-listings/:email",async(req, res)=>{
+
+    const email = req.params.email;
+   
+    try{
+
+        const result = await studio.find({ownerEmail:email}).toArray();
+         res.send({status:200, message:"success", data:result})
+    }catch(error){
+        console.dir(error)
+    }
+
+})
 
 
 
