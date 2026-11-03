@@ -114,6 +114,25 @@ app.get("/my-listings/:email",async(req, res)=>{
 })
 
 
+// ------------------- update my listing -------------------
+
+app.put("/my-listings/:id",async(req, res)=>{
+
+    const id = req.params.id;
+    const updateData = req.body;
+   
+    try{
+
+        const query = {_id: new ObjectId(id)}
+
+        const result = await studio.updateOne( query, {$set:updateData});
+         res.send({status:200, message:"success"})
+    }catch(error){
+        console.dir(error)
+    }
+
+})
+
 
     
 
