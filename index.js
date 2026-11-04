@@ -30,6 +30,7 @@ const db = await connectToMongoDB();
 
 const database = db.db("frame-space");
 const studio = database.collection("studios");
+const category = database.collection("category");
 
 // --------------- studio data post method --------------
 
@@ -131,6 +132,58 @@ app.put("/my-listings/:id",async(req, res)=>{
         console.dir(error)
     }
 
+})
+
+// ----------------- delete myListing ---------------------------
+
+
+
+app.delete("/my-listings/:id",async(req, res)=>{
+
+    const id = req.params.id;
+    
+   
+    try{
+
+        const query = {_id: new ObjectId(id)}
+
+           const result = await studio.deleteOne(query);
+         res.send({status:200, message:"success"})
+
+    }catch(error){
+        console.dir(error)
+    }
+
+})
+
+
+// --------------------- category data -----------------------
+
+app.get("/category" , async(req ,res)=>{
+    try{
+
+        const result = await category.find().toArray();
+        res.send({status:200 , message:"success" , data:result})
+
+    }catch(error){
+        console.log(error);
+    }
+})
+
+
+
+// ----------------- all studio lists ------------------
+
+app.get("/studioListings" , async(req ,res) =>{
+    try{
+        
+        const result =  await studio.find().toArray();
+
+        res.send({status:200 , message:"success" , data:result})
+
+    }catch(error){
+        console.log(error)
+    }
 })
 
 
