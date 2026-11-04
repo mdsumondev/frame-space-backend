@@ -187,6 +187,21 @@ app.get("/studioListings" , async(req ,res) =>{
 })
 
 
+// ------------------ categories wise studio data load  ------------------------
+
+
+app.get("/category/:category" , async(req ,res) =>{
+    const category = req.params.category;
+    const filter = {category:category};
+
+    try{
+          const result = await studio.find(filter).toArray();
+          res.send(result);
+    }catch(error){
+        console.log(error);
+    }
+})
+
     
 
 app.listen(PORT,() =>{
