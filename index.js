@@ -186,6 +186,21 @@ app.get("/studioListings" , async(req ,res) =>{
     }
 })
 
+// ------------------------  newest studios ----------------
+
+app.get("/neweststudios" , async(req ,res) =>{
+    try{
+        
+        const result =  await studio.find().sort({ createdAt: -1 }).limit(6).toArray();
+
+        res.send({status:200 , message:"success" , data:result})
+
+    }catch(error){
+        console.log(error)
+    }
+})
+
+
 
 // ------------------ categories wise studio data load  ------------------------
 
