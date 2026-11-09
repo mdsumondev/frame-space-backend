@@ -237,6 +237,51 @@ app.post("/studio-book" , async(req , res) =>{
 
 })
 
+// ---------------------- my booking studio -----------------
+
+
+app.get("/my-booking/:email" , async(req , res) =>{
+ 
+    try{
+
+        const {email} = req.params;
+        console.log(email);
+       
+        const query = {email:email};
+
+        const result = await studioBook.find(query).toArray();
+
+        res.send({status:200 , message:"success" , data:result})
+
+
+    }catch (error){
+         res.send(error)
+    }
+
+})
+
+
+// ----------------------- delete booking data ----------------------
+
+
+
+app.delete("/studio-book/:id",async(req, res)=>{
+
+    const id = req.params.id;
+    
+   
+    try{
+
+        const query = {_id: new ObjectId(id)}
+
+           const result = await studioBook.deleteOne(query);
+         res.send({status:200, message:"success"})
+
+    }catch(error){
+        console.dir(error)
+    }
+
+})
 
 
 app.listen(PORT,() =>{
