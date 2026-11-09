@@ -31,6 +31,7 @@ const db = await connectToMongoDB();
 const database = db.db("frame-space");
 const studio = database.collection("studios");
 const category = database.collection("category");
+const studioBook = database.collection("studio-book");
 
 // --------------- studio data post method --------------
 
@@ -217,7 +218,26 @@ app.get("/category/:category" , async(req ,res) =>{
     }
 })
 
-    
+
+// ---------------- book data -----------------
+
+app.post("/studio-book" , async(req , res) =>{
+ 
+    try{
+
+        const bookingData = req.body;
+       
+          const result = await studioBook.insertOne(bookingData);
+          res.send({status:200 , message:"success"})
+
+
+    }catch (error){
+         res.send(error)
+    }
+
+})
+
+
 
 app.listen(PORT,() =>{
     console.log("Server is running on port " + PORT);
