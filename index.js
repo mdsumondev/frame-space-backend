@@ -1,291 +1,441 @@
 
 import express from "express";
-import cors from "cors"
-import 'dotenv/config'
-import { MongoClient , ObjectId} from 'mongodb';
+import cors from "cors";
+import "dotenv/config";
+import { MongoClient, ObjectId } from "mongodb";
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+
+// ---------------- Middleware ----------------
 
 app.use(cors());
 app.use(express.json());
 
+// ---------------- MongoDB Connection ----------------
 
-
-// ----------- mongodb connection ------------
-
-const client = new MongoClient(`${process.env.MONGODB_URI}`);
-
-export async function connectToMongoDB() {
-  try {
-    await client.connect();
-    console.log("You successfully connected to MongoDB!");
-    return client;
-  } catch (err) {
-    console.dir(err);
-  }
+if (!process.env.MONGODB_URI) {
+  throw new Error("MONGODB_URI environment variable is missing");
 }
 
-const db = await connectToMongoDB();
+const client = new MongoClient(process.env.MONGODB_URI);
 
-const database = db.db("frame-space");
+let clientPromise;
+
+const connectToMongoDB = async () => {
+  if (!clientPromise) {
+    clientPromise = client.connect().catch((error) => {
+      clientPromise = undefined;
+      throw error;
+    });
+  }
+
+  return clientPromise;
+};
+
+const database = client.db("frame-space");
+
 const studio = database.collection("studios");
 const category = database.collection("category");
 const studioBook = database.collection("studio-book");
 
-// --------------- studio data post method --------------
+// ---------------- Database Middleware ----------------
 
+app.use(async (req, res, next) => {
+  try {
+    await connectToMongoDB();
+    next();
+  } catch (error) {
+    console.error("MongoDB Connection Error:", error);
 
-app.post("/add-studio" , async(req,res) =>{
+    return res.status(500).send({
+      status: 500,
+      message: "Database connection failed",
+    });
+  }
+});
 
+// ---------------- Helper: Validate ObjectId ----------------
+
+const isValidObjectId = (id) => ObjectId.isValid(id);
+
+// ---------------- Root API ----------------
+
+app.get("/", (req, res) => {
+  res.status(200).send("FrameSpace API is running!");
+});
+
+// ---------------- Add Studio ----------------
+
+app.post("/add-studio", async (req, res) => {
+  try {
     const studioData = req.body;
 
-    try{
+    const result = await studio.insertOne(studioData);
 
-        const result = await studio.insertOne(studioData);
+    return res.send({
+      status: 200,
+      message: "success",
+    });
+  } catch (error) {
+    console.error("Add Studio Error:", error);
 
-        console.log(result);
-        res.send({status:200 , message:"success"})
+    return res.status(500).send({
+      status: 500,
+      message: "Internal Server Error",
+    });
+  }
+});
 
-    }catch(error){
-        console.log(error);
-    }
+// ---------------- Get All Studios ----------------
 
+app.get("/studios", async (req, res) => {
+  try {
+    const result = await studio.find().toArray();
 
-    res.send("server is running");
-})
+    return res.send({
+      status: 200,
+      message: "success",
+      data: result,
+    });
+  } catch (error) {
+    console.error("Get Studios Error:", error);
 
+    return res.status(500).send({
+      status: 500,
+      message: "Internal Server Error",
+    });
+  }
+});
 
-// -------------------------- studio data get -------------------------
+// ---------------- Get Single Studio ----------------
 
-app.get("/studios", async (req , res) =>{
-    try{
-        const result =  await studio.find();
-        res.send({status:200 , message:"success" , data: await result.toArray()});
-    }catch(error){
-        console.dir(error);
-    }
-})
-
-
-
-// ----------------- single studio data get -------------------------
-
-app.get("/studios/:id" , async(req, res) =>{
+app.get("/studios/:id", async (req, res) => {
+  try {
     const id = req.params.id;
-    const query = {_id: new ObjectId(id)};
-    try{
-        const result = await studio.findOne(query);
-        res.send({status:200 , message:"success" , data: result});
-    }catch(error){
-        console.dir(error);
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).send({
+        status: 400,
+        message: "Invalid studio ID",
+      });
     }
-})
 
-// ----------------------- studio data update -------------------------
+    const query = { _id: new ObjectId(id) };
 
+    const result = await studio.findOne(query);
 
+    return res.send({
+      status: 200,
+      message: "success",
+      data: result,
+    });
+  } catch (error) {
+    console.error("Get Single Studio Error:", error);
 
-app.put("/studios/:id" , async(req, res) =>{
+    return res.status(500).send({
+      status: 500,
+      message: "Internal Server Error",
+    });
+  }
+});
+
+// ---------------- Update Studio ----------------
+
+app.put("/studios/:id", async (req, res) => {
+  try {
     const id = req.params.id;
-    const query = {_id: new ObjectId(id)};
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).send({
+        status: 400,
+        message: "Invalid studio ID",
+      });
+    }
+
+    const query = { _id: new ObjectId(id) };
     const updateData = req.body;
-    try{
-        const result = await studio.updateOne(query, {$set:updateData});
-        res.send({status:200 , message:"success" , data: result});
-    }catch(error){
-        console.dir(error);
-    }
-})
 
+    const result = await studio.updateOne(query, {
+      $set: updateData,
+    });
 
-// ---------------- my listing  -----------------
+    return res.send({
+      status: 200,
+      message: "success",
+      data: result,
+    });
+  } catch (error) {
+    console.error("Update Studio Error:", error);
 
-app.get("/my-listings/:email",async(req, res)=>{
+    return res.status(500).send({
+      status: 500,
+      message: "Internal Server Error",
+    });
+  }
+});
 
+// ---------------- My Listings ----------------
+
+app.get("/my-listings/:email", async (req, res) => {
+  try {
     const email = req.params.email;
-   
-    try{
 
-        const result = await studio.find({ownerEmail:email}).toArray();
-         res.send({status:200, message:"success", data:result})
-    }catch(error){
-        console.dir(error)
-    }
+    const result = await studio
+      .find({ ownerEmail: email })
+      .toArray();
 
-})
+    return res.send({
+      status: 200,
+      message: "success",
+      data: result,
+    });
+  } catch (error) {
+    console.error("My Listings Error:", error);
 
+    return res.status(500).send({
+      status: 500,
+      message: "Internal Server Error",
+    });
+  }
+});
 
-// ------------------- update my listing -------------------
+// ---------------- Update My Listing ----------------
 
-app.put("/my-listings/:id",async(req, res)=>{
-
+app.put("/my-listings/:id", async (req, res) => {
+  try {
     const id = req.params.id;
     const updateData = req.body;
-   
-    try{
 
-        const query = {_id: new ObjectId(id)}
-
-        const result = await studio.updateOne( query, {$set:updateData});
-         res.send({status:200, message:"success"})
-    }catch(error){
-        console.dir(error)
+    if (!isValidObjectId(id)) {
+      return res.status(400).send({
+        status: 400,
+        message: "Invalid listing ID",
+      });
     }
 
-})
+    const query = { _id: new ObjectId(id) };
 
-// ----------------- delete myListing ---------------------------
+    await studio.updateOne(query, {
+      $set: updateData,
+    });
 
+    return res.send({
+      status: 200,
+      message: "success",
+    });
+  } catch (error) {
+    console.error("Update My Listing Error:", error);
 
+    return res.status(500).send({
+      status: 500,
+      message: "Internal Server Error",
+    });
+  }
+});
 
-app.delete("/my-listings/:id",async(req, res)=>{
+// ---------------- Delete My Listing ----------------
 
+app.delete("/my-listings/:id", async (req, res) => {
+  try {
     const id = req.params.id;
-    
-   
-    try{
 
-        const query = {_id: new ObjectId(id)}
-
-           const result = await studio.deleteOne(query);
-         res.send({status:200, message:"success"})
-
-    }catch(error){
-        console.dir(error)
+    if (!isValidObjectId(id)) {
+      return res.status(400).send({
+        status: 400,
+        message: "Invalid listing ID",
+      });
     }
 
-})
+    const query = { _id: new ObjectId(id) };
 
+    await studio.deleteOne(query);
 
-// --------------------- category data -----------------------
+    return res.send({
+      status: 200,
+      message: "success",
+    });
+  } catch (error) {
+    console.error("Delete My Listing Error:", error);
 
-app.get("/category" , async(req ,res)=>{
-    try{
+    return res.status(500).send({
+      status: 500,
+      message: "Internal Server Error",
+    });
+  }
+});
 
-        const result = await category.find().toArray();
-        res.send({status:200 , message:"success" , data:result})
+// ---------------- Get Categories ----------------
 
-    }catch(error){
-        console.log(error);
-    }
-})
+app.get("/category", async (req, res) => {
+  try {
+    const result = await category.find().toArray();
 
+    return res.send({
+      status: 200,
+      message: "success",
+      data: result,
+    });
+  } catch (error) {
+    console.error("Get Categories Error:", error);
 
+    return res.status(500).send({
+      status: 500,
+      message: "Internal Server Error",
+    });
+  }
+});
 
-// ----------------- all studio lists ------------------
+// ---------------- All Studio Listings ----------------
 
-app.get("/studioListings" , async(req ,res) =>{
-    try{
-        
-        const result =  await studio.find().toArray();
+app.get("/studioListings", async (req, res) => {
+  try {
+    const result = await studio.find().toArray();
 
-        res.send({status:200 , message:"success" , data:result})
+    return res.send({
+      status: 200,
+      message: "success",
+      data: result,
+    });
+  } catch (error) {
+    console.error("Studio Listings Error:", error);
 
-    }catch(error){
-        console.log(error)
-    }
-})
+    return res.status(500).send({
+      status: 500,
+      message: "Internal Server Error",
+    });
+  }
+});
 
-// ------------------------  newest studios ----------------
+// ---------------- Newest Studios ----------------
 
-app.get("/neweststudios" , async(req ,res) =>{
-    try{
-        
-        const result =  await studio.find().sort({ createdAt: -1 }).limit(6).toArray();
+app.get("/neweststudios", async (req, res) => {
+  try {
+    const result = await studio
+      .find()
+      .sort({ createdAt: -1 })
+      .limit(6)
+      .toArray();
 
-        res.send({status:200 , message:"success" , data:result})
+    return res.send({
+      status: 200,
+      message: "success",
+      data: result,
+    });
+  } catch (error) {
+    console.error("Newest Studios Error:", error);
 
-    }catch(error){
-        console.log(error)
-    }
-})
+    return res.status(500).send({
+      status: 500,
+      message: "Internal Server Error",
+    });
+  }
+});
 
+// ---------------- Category Wise Studios ----------------
 
+app.get("/category/:category", async (req, res) => {
+  try {
+    const categoryName = req.params.category;
 
-// ------------------ categories wise studio data load  ------------------------
+    const filter = {
+      category: categoryName,
+    };
 
+    const result = await studio.find(filter).toArray();
 
-app.get("/category/:category" , async(req ,res) =>{
-    const category = req.params.category;
-    const filter = {category:category};
+    return res.send(result);
+  } catch (error) {
+    console.error("Category Wise Studios Error:", error);
 
-    try{
-          const result = await studio.find(filter).toArray();
-          res.send(result);
-    }catch(error){
-        console.log(error);
-    }
-})
+    return res.status(500).send({
+      status: 500,
+      message: "Internal Server Error",
+    });
+  }
+});
 
+// ---------------- Add Studio Booking ----------------
 
-// ---------------- book data -----------------
+app.post("/studio-book", async (req, res) => {
+  try {
+    const bookingData = req.body;
 
-app.post("/studio-book" , async(req , res) =>{
- 
-    try{
+    await studioBook.insertOne(bookingData);
 
-        const bookingData = req.body;
-       
-          const result = await studioBook.insertOne(bookingData);
-          res.send({status:200 , message:"success"})
+    return res.send({
+      status: 200,
+      message: "success",
+    });
+  } catch (error) {
+    console.error("Add Booking Error:", error);
 
+    return res.status(500).send({
+      status: 500,
+      message: "Internal Server Error",
+    });
+  }
+});
 
-    }catch (error){
-         res.send(error)
-    }
+// ---------------- My Booking Studios ----------------
 
-})
+app.get("/my-booking/:email", async (req, res) => {
+  try {
+    const { email } = req.params;
 
-// ---------------------- my booking studio -----------------
+    const query = {
+      email: email,
+    };
 
+    const result = await studioBook.find(query).toArray();
 
-app.get("/my-booking/:email" , async(req , res) =>{
- 
-    try{
+    return res.send({
+      status: 200,
+      message: "success",
+      data: result,
+    });
+  } catch (error) {
+    console.error("My Booking Error:", error);
 
-        const {email} = req.params;
-        console.log(email);
-       
-        const query = {email:email};
+    return res.status(500).send({
+      status: 500,
+      message: "Internal Server Error",
+    });
+  }
+});
 
-        const result = await studioBook.find(query).toArray();
+// ---------------- Delete Booking ----------------
 
-        res.send({status:200 , message:"success" , data:result})
-
-
-    }catch (error){
-         res.send(error)
-    }
-
-})
-
-
-// ----------------------- delete booking data ----------------------
-
-
-
-app.delete("/studio-book/:id",async(req, res)=>{
-
+app.delete("/studio-book/:id", async (req, res) => {
+  try {
     const id = req.params.id;
-    
-   
-    try{
 
-        const query = {_id: new ObjectId(id)}
-
-           const result = await studioBook.deleteOne(query);
-         res.send({status:200, message:"success"})
-
-    }catch(error){
-        console.dir(error)
+    if (!isValidObjectId(id)) {
+      return res.status(400).send({
+        status: 400,
+        message: "Invalid booking ID",
+      });
     }
 
-})
+    const query = {
+      _id: new ObjectId(id),
+    };
 
+    await studioBook.deleteOne(query);
 
-app.listen(PORT,() =>{
-    console.log("Server is running on port " + PORT);
-})
+    return res.send({
+      status: 200,
+      message: "success",
+    });
+  } catch (error) {
+    console.error("Delete Booking Error:", error);
 
-module.exports = app;
+    return res.status(500).send({
+      status: 500,
+      message: "Internal Server Error",
+    });
+  }
+});
+
+// ---------------- Export Express App ----------------
+
+export default app;
